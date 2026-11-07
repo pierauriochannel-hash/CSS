@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catálogo CCSS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,400&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; overflow-x: hidden; user-select: none; -webkit-user-select: none; }
+        .font-editorial { font-family: 'Playfair Display', serif; }
+        .bg-moving-dots { background-color: #ffffff; background-image: radial-gradient(#b8b8b8 1.75px, transparent 1.75px); background-size: 28px 28px; animation: moveDiagonalUpLeft 3.5s linear infinite; }
+        @keyframes moveDiagonalUpLeft { 0% { background-position: 0px 0px; } 100% { background-position: -28px -28px; } }
+        
+        .perspective-stage { perspective: 2500px; }
+        .book-container { position: absolute; top: 0; left: 50%; width: 50%; max-width: 420px; height: 100%; transform-style: preserve-3d; transform-origin: left center; transition: transform 0.8s cubic-bezier(0.25, 1, 0.5, 1); }
+        
+        @media (max-width: 639px) { 
+            .book-container { width: 88%; left: 50%; } 
+            .book-container.is-closed { transform: translateX(-50%); } 
+            .book-container.is-open { transform: translateX(-15%); } 
+            .book-container.is-fully-flipped { transform: translateX(50%); } 
+        }
+        @media (min-width: 640px) { 
+            .book-container.is-closed { transform: translateX(-50%); } 
+            .book-container.is-open { transform: translateX(0%); } 
+            .book-container.is-fully-flipped { transform: translateX(50%); } 
+        }
+        
+        .book-page { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform-origin: left center; transition: transform 0.9s cubic-bezier(0.25, 1, 0.5, 1); transform-style: preserve-3d; cursor: pointer; }
+        .book-page.flipped { transform: rotateY(-180deg); }
+        .page-face { position: absolute; top: 0; left: 0; width: 100%; height: 100%; backface-visibility: hidden; display: flex; flex-direction: column; overflow: hidden; }
+        
+        .page-front { background-color: #fcfaf5; border: 1px solid #9ca3af; border-radius: 0 0.75rem 0.75rem 0; box-shadow: inset 18px 0 30px -12px rgba(0, 0, 0, 0.12), 4px 4px 10px rgba(0,0,0,0.08); }
+        .page-back { background-color: #d1d5db; transform: rotateY(180deg); border: 1px solid #9ca3af; border-radius: 0.75rem 0 0 0.75rem; box-shadow: inset -18px 0 30px -12px rgba(0, 0, 0, 0.12), -4px 4px 10px rgba(0,0,0,0.08); }
+        .page-glare { background: linear-gradient(90deg, rgba(0,0,0,0.12) 0%, rgba(255,255,255,0.4) 15%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.06) 100%); pointer-events: none; }
+        
+        .fade-mask-vertical { -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 16%, black 84%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 0%, black 16%, black 84%, transparent 100%); }
+        .vertical-marquee-track { display: flex; flex-direction: column; gap: 1.25rem; animation: scrollUpInfinite 75s linear infinite; will-change: transform; }
+        .vertical-marquee-track:hover { animation-play-state: running; }
+        @keyframes scrollUpInfinite { 0% { transform: translateY(0); } 100% { transform: translateY(-50%); } }
+        
+        .media-slider-track { display: flex; width: 200%; height: 100%; transition: transform 0.65s cubic-bezier(0.22, 1, 0.36, 1); will-change: transform; }
+        @keyframes pulseBar { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+        .eq-bar { animation: pulseBar 1.2s ease-in-out infinite; transform-origin: bottom; }
+        .eq-paused .eq-bar { animation-play-state: paused; transform: scaleY(0.25); transition: transform 0.3s ease; }
+    </style>
+</head>
+<body class="bg-moving-dots min-h-screen w-full text-slate-800 flex flex-col justify-between relative overflow-hidden">
+
+    <header class="w-full px-6 py-4 flex items-center justify-end z-50 fixed top-0 left-0 pointer-events-none">
+        <button id="toggleViewBtn" onclick="toggleMainView()" class="pointer-events-auto group relative inline-flex items-center gap-2.5 px-6 py-3 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-medium text-sm rounded-2xl shadow-lg transition-all duration-300 border border-slate-700 cursor-pointer">
+            <svg class="w-4 h-4 text-slate-300 group-hover:rotate-6 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span id="toggleViewBtnText">Imágenes</span>
+        </button>
+    </header>
+
+    <main id="viewCatalog" class="flex-1 w-full h-screen flex flex-col items-center justify-center px-4 pt-16 pb-6 transition-opacity duration-500">
+        <div class="perspective-stage w-full max-w-5xl flex-1 flex items-center justify-center relative my-1 max-h-[74vh]">
+            <div id="bookContainer" class="book-container shadow-2xl rounded-r-xl is-closed">
+                <div id="bookShadow1" class="absolute inset-0 bg-gray-300 rounded-r-xl translate-x-2.5 translate-y-2.5 shadow-xl pointer-events-none z-0 transition-opacity duration-700"></div>
+                <div id="bookShadow2" class="absolute inset-0 bg-gray-200 rounded-r-xl translate-x-1 translate-y-1 shadow-lg pointer-events-none z-0 transition-opacity duration-700"></div>
+                <div id="bookPages" class="absolute inset-0 z-10 w-full h-full"></div>
+            </div>
+        </div>
+        <div class="mt-3 flex items-center gap-4 bg-white/90 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-gray-300 shadow-sm z-20">
+            <button onclick="changeCatalogPage(-1)" id="prevPageBtn" class="px-3.5 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 active:scale-95 text-gray-700 text-xs font-semibold transition flex items-center gap-1 disabled:opacity-40 disabled:pointer-events-none cursor-pointer">← Anterior</button>
+            <div id="pageDotsContainer" class="flex items-center gap-1.5"></div>
+            <button onclick="changeCatalogPage(1)" id="nextPageBtn" class="px-3.5 py-1.5 rounded-xl bg-black hover:bg-gray-800 active:scale-95 text-white text-xs font-semibold transition flex items-center gap-1 disabled:opacity-40 disabled:pointer-events-none cursor-pointer">Siguiente →</button>
+        </div>
+    </main>
+
+    <section id="viewMedia" class="hidden flex-1 w-full h-screen pt-20 pb-6 px-4 sm:px-8 lg:px-14 transition-opacity duration-500">
+        <div class="w-full h-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            
+            <div class="lg:col-span-6 flex flex-col items-center justify-center w-full">
+                <!-- Etiquetas rediseñadas en blanco, negro y gris -->
+                <div class="mb-3 flex items-center gap-3 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full border border-gray-300 shadow-sm">
+                    <span id="badgeModeAudio" class="text-xs font-bold px-2.5 py-1 rounded-full bg-black text-white transition-colors">1. Audio.ogg</span>
+                    <span class="text-xs text-gray-500 font-medium">⇄ Arrastra ⇄</span>
+                    <span id="badgeModeVideo" class="text-xs font-bold px-2.5 py-1 rounded-full bg-gray-200 text-gray-600 transition-colors">2. Video.mp4</span>
+                </div>
+
+                <div id="mediaSquare" class="relative w-full max-w-[440px] aspect-square bg-white rounded-3xl shadow-2xl border-2 border-gray-200/90 overflow-hidden cursor-grab active:cursor-grabbing select-none">
+                    <div id="mediaSliderTrack" class="media-slider-track">
+                        
+                        <!-- Panel de Audio en Tonos de Gris y Negro -->
+                        <div class="w-1/2 h-full p-6 sm:p-8 flex flex-col justify-between bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white relative">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-gray-300 animate-ping"></span>
+                                    <span class="text-xs font-semibold uppercase tracking-wider text-gray-300">Reproductor de Audio</span>
+                                </div>
+                            </div>
+                            <div class="my-auto flex flex-col items-center text-center">
+                                <div class="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-tr from-gray-500 to-gray-200 p-1 shadow-lg mb-4 flex items-center justify-center">
+                                    <div class="w-full h-full bg-gray-900 rounded-full flex items-center justify-center">
+                                        <svg class="w-11 h-11 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" /></svg>
+                                    </div>
+                                </div>
+                                <h3 class="text-lg font-bold tracking-tight text-white">Audio del Catálogo</h3>
+                                <div id="equalizerBox" class="eq-paused flex items-end justify-center gap-1.5 h-8 mt-4">
+                                    <div class="eq-bar w-1.5 h-full bg-gray-300 rounded-full" style="animation-delay: 0.0s"></div>
+                                    <div class="eq-bar w-1.5 h-full bg-gray-300 rounded-full" style="animation-delay: 0.2s"></div>
+                                    <div class="eq-bar w-1.5 h-full bg-gray-300 rounded-full" style="animation-delay: 0.4s"></div>
+                                    <div class="eq-bar w-1.5 h-full bg-gray-300 rounded-full" style="animation-delay: 0.1s"></div>
+                                    <div class="eq-bar w-1.5 h-full bg-gray-300 rounded-full" style="animation-delay: 0.3s"></div>
+                                    <div class="eq-bar w-1.5 h-full bg-gray-300 rounded-full" style="animation-delay: 0.5s"></div>
+                                </div>
+                            </div>
+                            <div class="w-full space-y-3" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">
+                                <audio id="catalogAudioPlayer" controls preload="metadata" class="w-full h-10 rounded-xl"><source src="Video/Audio.ogg" type="audio/ogg"></audio>
+                                <div class="flex items-center justify-between text-[11px] text-gray-400 pt-1 border-t border-gray-700">
+                                    <span>Desliza a la izquierda</span>
+                                    <button onclick="switchSquarePanel('video')" class="text-gray-300 hover:text-white hover:underline font-semibold cursor-pointer">Ir a Video →</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Panel de Video en Negro y Gris -->
+                        <div class="w-1/2 h-full p-6 sm:p-7 flex flex-col justify-between bg-black text-white relative">
+                            <div class="flex items-center justify-between z-10">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-gray-400 animate-pulse"></span>
+                                    <span class="text-xs font-semibold uppercase tracking-wider text-gray-300">Reproductor de Video</span>
+                                </div>
+                            </div>
+                            <div class="relative flex-1 my-3 rounded-2xl overflow-hidden bg-gray-900 border border-gray-700 flex items-center justify-center shadow-inner" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">
+                                <video id="catalogVideoPlayer" controls preload="metadata" playsinline class="w-full h-full object-contain"><source src="Video/Video.mp4" type="video/mp4"></video>
+                            </div>
+                            <div class="flex items-center justify-between text-[11px] text-gray-400 pt-1 border-t border-gray-700 z-10" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">
+                                <button onclick="switchSquarePanel('audio')" class="text-gray-300 hover:text-white hover:underline font-semibold cursor-pointer">← Volver a Audio</button>
+                                <span>Arrastra a la derecha</span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-6 h-[75vh] sm:h-[82vh] flex flex-col items-center justify-center relative w-full">
+                <div class="fade-mask-vertical w-full max-w-md h-full overflow-hidden relative px-3">
+                    <div id="infinitePhotosTrack" class="vertical-marquee-track w-full"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        const TOTAL_CATALOG_PAGES = 8;
+        const TOTAL_VERTICAL_PHOTOS = 33;
+        
+        let currentCatalogPage = 1;
+        let currentView = 'catalog';
+        let currentSquareMode = 'audio'; 
+
+        function toggleMainView() {
+            const viewCatalog = document.getElementById('viewCatalog');
+            const viewMedia = document.getElementById('viewMedia');
+            const btnText = document.getElementById('toggleViewBtnText');
+
+            if (currentView === 'catalog') {
+                currentView = 'media';
+                viewCatalog.classList.add('hidden');
+                viewMedia.classList.remove('hidden');
+                btnText.textContent = 'Volver al Catálogo';
+            } else {
+                currentView = 'catalog';
+                viewMedia.classList.add('hidden');
+                viewCatalog.classList.remove('hidden');
+                btnText.textContent = 'Imágenes';
+                
+                const audioEl = document.getElementById('catalogAudioPlayer');
+                const videoEl = document.getElementById('catalogVideoPlayer');
+                if (audioEl) audioEl.pause();
+                if (videoEl) videoEl.pause();
+            }
+        }
+
+        function initBook() {
+            const pagesWrapper = document.getElementById('bookPages');
+            pagesWrapper.innerHTML = '';
+            
+            for(let i=1; i<=TOTAL_CATALOG_PAGES; i++) {
+                const page = document.createElement('div');
+                page.className = 'book-page';
+                page.id = 'page-' + i;
+                
+                const front = document.createElement('div');
+                front.className = 'page-face page-front';
+                front.innerHTML = `
+                    <div class="page-glare absolute inset-0 z-20 pointer-events-none"></div>
+                    <div class="px-5 py-2.5 border-b border-gray-300 flex items-center justify-between text-[11px] text-gray-600 font-editorial bg-gray-50 z-10">
+                        <span>CATÁLOGO COLECCIÓN</span>
+                        <span>EDICIÓN N.º 0${i} / 08</span>
+                    </div>
+                    <div class="relative flex-1 w-full h-full flex items-center justify-center bg-gray-100/70 p-2 sm:p-4 overflow-hidden">
+                        <img src="Imagenes/${i}.jpg" draggable="false" alt="Página ${i}" class="max-w-full max-h-full w-auto h-auto object-contain rounded shadow-sm pointer-events-none" />
+                    </div>
+                    <div class="px-5 py-2 border-t border-gray-300 flex items-center justify-between text-[11px] text-gray-500 bg-gray-50 z-10">
+                        <span class="font-mono text-gray-400">Imagenes/${i}.jpg</span>
+                        <span class="font-semibold text-gray-700">Pág. ${i}</span>
+                    </div>
+                `;
+
+                const back = document.createElement('div');
+                back.className = 'page-face page-back flex items-center justify-center';
+                back.innerHTML = ``;
+
+                page.appendChild(front);
+                page.appendChild(back);
+                pagesWrapper.appendChild(page);
+            }
+            updateBookZIndexes();
+        }
+
+        function updateBookZIndexes() {
+            let flippedCount = 0;
+            for(let i=1; i<=TOTAL_CATALOG_PAGES; i++) {
+                const page = document.getElementById('page-' + i);
+                if (!page) continue;
+                if (page.classList.contains('flipped')) {
+                    page.style.zIndex = i;
+                    flippedCount++;
+                } else {
+                    page.style.zIndex = TOTAL_CATALOG_PAGES - i + 1;
+                }
+            }
+            
+            const container = document.getElementById('bookContainer');
+            const shadow1 = document.getElementById('bookShadow1');
+            const shadow2 = document.getElementById('bookShadow2');
+
+            container.classList.remove('is-closed', 'is-open', 'is-fully-flipped');
+            
+            if (flippedCount === 0) {
+                container.classList.add('is-closed');
+                if(shadow1) shadow1.style.opacity = '1';
+                if(shadow2) shadow2.style.opacity = '1';
+            } else if (flippedCount === TOTAL_CATALOG_PAGES) {
+                container.classList.add('is-fully-flipped');
+                if(shadow1) shadow1.style.opacity = '0';
+                if(shadow2) shadow2.style.opacity = '0';
+            } else {
+                container.classList.add('is-open');
+                if(shadow1) shadow1.style.opacity = '1';
+                if(shadow2) shadow2.style.opacity = '1';
+            }
+            
+            renderPageDots();
+            document.getElementById('prevPageBtn').disabled = currentCatalogPage <= 1;
+            document.getElementById('nextPageBtn').disabled = currentCatalogPage > TOTAL_CATALOG_PAGES;
+        }
+
+        function changeCatalogPage(direction) {
+            if (direction > 0 && currentCatalogPage <= TOTAL_CATALOG_PAGES) {
+                const page = document.getElementById('page-' + currentCatalogPage);
+                if (page) { page.classList.add('flipped'); currentCatalogPage++; updateBookZIndexes(); }
+            } else if (direction < 0 && currentCatalogPage > 1) {
+                currentCatalogPage--;
+                const page = document.getElementById('page-' + currentCatalogPage);
+                if (page) { page.classList.remove('flipped'); updateBookZIndexes(); }
+            }
+        }
+
+        function jumpToCatalogPage(targetPage) {
+            if (targetPage === currentCatalogPage) return;
+            if (targetPage > currentCatalogPage) {
+                for (let i = currentCatalogPage; i < targetPage; i++) {
+                    const p = document.getElementById('page-' + i);
+                    if(p) p.classList.add('flipped');
+                }
+            } else {
+                for (let i = currentCatalogPage - 1; i >= targetPage; i--) {
+                    const p = document.getElementById('page-' + i);
+                    if(p) p.classList.remove('flipped');
+                }
+            }
+            currentCatalogPage = targetPage;
+            updateBookZIndexes();
+        }
+
+        function renderPageDots() {
+            const container = document.getElementById('pageDotsContainer');
+            if (!container) return;
+            container.innerHTML = '';
+            let displayPage = currentCatalogPage > TOTAL_CATALOG_PAGES ? TOTAL_CATALOG_PAGES : currentCatalogPage;
+            for (let i = 1; i <= TOTAL_CATALOG_PAGES; i++) {
+                const dot = document.createElement('button');
+                dot.className = `h-2 rounded-full transition-all duration-300 cursor-pointer ${ i === displayPage ? 'w-6 bg-black' : 'w-2 bg-gray-300 hover:bg-gray-400' }`;
+                dot.title = `Ir a página ${i}`;
+                dot.onclick = () => jumpToCatalogPage(i);
+                container.appendChild(dot);
+            }
+        }
+
+        function setupBookDrag() {
+            const container = document.getElementById('bookContainer');
+            let startX = 0, isDragging = false;
+            const onStart = (clientX) => { isDragging = true; startX = clientX; };
+            const onEnd = (clientX) => {
+                if (!isDragging) return;
+                isDragging = false;
+                const deltaX = clientX - startX;
+                if (deltaX < -40) changeCatalogPage(1); 
+                else if (deltaX > 40) changeCatalogPage(-1); 
+            };
+            container.addEventListener('mousedown', (e) => onStart(e.clientX));
+            window.addEventListener('mouseup', (e) => onEnd(e.clientX));
+            container.addEventListener('touchstart', (e) => { if(e.touches.length === 1) onStart(e.touches[0].clientX); }, { passive: true });
+            window.addEventListener('touchend', (e) => { if(e.changedTouches.length === 1) onEnd(e.changedTouches[0].clientX); });
+        }
+
+        function buildInfiniteVerticalPhotos() {
+            const track = document.getElementById('infinitePhotosTrack');
+            track.innerHTML = '';
+            for (let loop = 0; loop < 2; loop++) {
+                for (let i = 1; i <= TOTAL_VERTICAL_PHOTOS; i++) {
+                    const card = document.createElement('div');
+                    card.className = 'w-full bg-white rounded-xl shadow-md border border-gray-300 flex flex-col overflow-hidden transition-transform duration-300 hover:scale-[1.02]';
+                    card.innerHTML = `
+                        <div class="w-full relative flex items-center justify-center bg-gray-100">
+                            <img src="Video/Fotos/${i}.jpeg" alt="Foto ${i}" loading="lazy" draggable="false" class="w-full h-auto max-h-[350px] object-contain" />
+                            <span class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-sm text-white text-[11px] font-mono px-2.5 py-1 rounded-md border border-gray-500">#${i} / 33</span>
+                        </div>
+                    `;
+                    track.appendChild(card);
+                }
+            }
+        }
+
+        function switchSquarePanel(targetMode) {
+            const track = document.getElementById('mediaSliderTrack');
+            const badgeAudio = document.getElementById('badgeModeAudio');
+            const badgeVideo = document.getElementById('badgeModeVideo');
+            
+            currentSquareMode = targetMode;
+            
+            if (targetMode === 'video') {
+                track.style.transform = 'translateX(-50%)';
+                if(badgeVideo) badgeVideo.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-black text-white transition-colors';
+                if(badgeAudio) badgeAudio.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-gray-200 text-gray-600 transition-colors';
+            } else {
+                track.style.transform = 'translateX(0%)';
+                if(badgeAudio) badgeAudio.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-black text-white transition-colors';
+                if(badgeVideo) badgeVideo.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-gray-200 text-gray-600 transition-colors';
+            }
+        }
+
+        function setupMediaSquareSwipe() {
+            const square = document.getElementById('mediaSquare');
+            const track = document.getElementById('mediaSliderTrack');
+            let isDragging = false, startX = 0, deltaX = 0;
+            const onStart = (clientX) => { isDragging = true; startX = clientX; deltaX = 0; track.style.transition = 'none'; };
+            const onMove = (clientX) => {
+                if (!isDragging) return;
+                deltaX = clientX - startX;
+                const basePercent = currentSquareMode === 'audio' ? 0 : -50;
+                const movePercent = (deltaX / (square.offsetWidth || 400)) * 50;
+                track.style.transform = `translateX(${Math.max(-55, Math.min(5, basePercent + movePercent))}%)`;
+            };
+            const onEnd = () => {
+                if (!isDragging) return;
+                isDragging = false;
+                track.style.transition = '';
+                if (deltaX < -50 && currentSquareMode === 'audio') switchSquarePanel('video');
+                else if (deltaX > 50 && currentSquareMode === 'video') switchSquarePanel('audio');
+                else switchSquarePanel(currentSquareMode);
+            };
+            square.addEventListener('mousedown', (e) => onStart(e.clientX));
+            window.addEventListener('mousemove', (e) => onMove(e.clientX));
+            window.addEventListener('mouseup', onEnd);
+            square.addEventListener('touchstart', (e) => { if (e.touches.length === 1) onStart(e.touches[0].clientX); }, { passive: true });
+            window.addEventListener('touchmove', (e) => { if (isDragging && e.touches.length === 1) onMove(e.touches[0].clientX); }, { passive: true });
+            window.addEventListener('touchend', onEnd);
+        }
+
+        function arrancarCatalogo() {
+            initBook();
+            setupBookDrag();
+            buildInfiniteVerticalPhotos();
+            setupMediaSquareSwipe();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', arrancarCatalogo);
+        } else {
+            arrancarCatalogo();
+        }
+    </script>
+</body>
+</html>
